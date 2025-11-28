@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expense Tracker with Charts</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); overflow: hidden; }
+    .header { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 30px; text-align: center; }
+    .main { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; padding: 30px; }
+    
+    .form-section { background: #f8f9ff; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
+    input, select { width: 100%; padding: 12px 15px; border: 2px solid #e1e5e9; border-radius: 10px; font-size: 16px; transition: border-color 0.3s; }
+    input:focus, select:focus { outline: none; border-color: #4facfe; }
+    button { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border: none; padding: 15px 30px; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s; width: 100%; }
+    button:hover { transform: translateY(-2px); }
+    
+    .charts-section, .history-section { background: #f8f9ff; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+    .chart-container { position: relative; height: 300px; margin-bottom: 20px; }
+    .summary { background: white; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    .total-amount { font-size: 2.5em; font-weight: bold; color: #e74c3c; }
+    
+    .transactions { max-height: 400px; overflow-y: auto; }
+    .transaction { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: white; margin-bottom: 10px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
+    .transaction-info { flex: 1; }
+    .amount { font-weight: bold; color: #e74c3c; font-size: 1.2em; }
+    .delete-btn { background: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    .delete-btn:hover { background: #c0392b; }
+    
+    @media (max-width: 768px) { .main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>💰 Expense Tracker</h1>
+      <p>Track your expenses with beautiful charts</p>
+    </div>
+    
+    <div class="main">
+      <div class="form-section">
+        <div class="summary">
+          <div class="total-amount" id="totalAmount">$0.00</div>
+          <div>Total Expenses</div>
+        </div>
+        
+        <form id="expenseForm">
+          <div class="form-group">
+            <label for="name">Expense Name</label>
+            <input type="text" id="name" name="name" required>
+          </div>
+          <div class="form-group">
+            <label for="amount">Amount ($)</label>
+            <input type="number" id="amount" name="amount" min="0" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label for="category">Category</label>
+            <select id="category" name="category" required>
+              <option value="">Select Category</option>
+              <option value="Food">🍔 Food</option>
+              <option value="Transport">🚗 Transport</option>
+              <option value="Shopping">🛒 Shopping</option>
+              <option value="Entertainment">🎬 Entertainment</option>
+              <option value="Bills">💡 Bills</option>
+              <option value="Other">📋 Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="date">Date</label>
+            <input type="date" id="date" name="date" required>
+          </div>
+          <button type="submit">Add Expense 🚀</button>
+        </form>
+      </div>
+      
+      <div class="charts-section">
+        <h3>📊 Spending Overview</h3>
+        <div class="chart-container">
+          <canvas id="categoryChart"></canvas>
+        </div>
+        <div class="chart-container">
+          <canvas id="monthlyChart"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <div class="history-section" style="padding: 30px;">
+      <h3>📋 Recent Transactions</h3>
+      <div class="transactions" id="transactions"></div>
+    </div>
+  </div>
+
+  <script>
+    let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+    let categoryChart, monthlyChart;
+
+    // ES6 Destructuring for DOM elements
+    const { 
+      expenseForm, 
+      name: nameInput, 
+      amount: amountInput, 
+      category: categoryInput, 
+      date: dateInput,
+      transactions: transactionsContainer,
+      totalAmount 
+    } = {
+      expenseForm: document.getElementById('expenseForm'),
+      name: document.getElementById('name'),
+      amount: document.getElementById('amount'),
+      category: document.getElementById('category'),
+      date: document.getElementById('date'),
+      transactions: document.getElementById('transactions'),
+      totalAmount: document.getElementById('totalAmount')
+    };
+
+    // Form handling with ES6 destructuring and validation
+    expenseForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      // ES6 destructuring from FormData using spread operator
+      const formData = new FormData(expenseForm);
+      const { name, amount, category, date } = Object.fromEntries(formData);
+      
+      // Form validation
+      if (!name?.trim() || amount <= 0 || !category || !date) {
+        alert('Please fill all fields correctly! Amount must be greater than 0.');
+        return;
+      }
+      
+      // Create new expense object
+      const expense = {
+        id: Date.now(),
+        name: name.trim(),
+        amount: parseFloat(amount),
+        category,
+        date
+      };
+      
+      // Immutable array update using spread operator
+      expenses = [...expenses, expense];
+      
+      // Persist to localStorage
+      localStorage.setItem('expenses', JSON.stringify(expenses));
+      
+      // Reset form and update UI
+      expenseForm.reset();
+      renderTransactions();
+      updateSummary();
+      updateCharts();
+    });
+
+    // Render transactions list with event delegation
+    function renderTransactions() {
+      transactionsContainer.innerHTML = '';
+      
+      expenses.slice(-10).reverse().forEach(expense => {
+        const div = document.createElement('div');
+        div.className = 'transaction';
+        div.innerHTML = `
+          <div class="transaction-info">
+            <div>${expense.name}</div>
+            <div style="color: #666; font-size: 0.9em;">
+              ${expense.category} • ${new Date(expense.date).toLocaleDateString()}
+            </div>
+          </div>
+          <div class="amount">$${expense.amount.toFixed(2)}</div>
+          <button class="delete-btn" data-id="${expense.id}">Delete</button>
+        `;
+        transactionsContainer.appendChild(div);
+      });
+      
+      // Event delegation for delete buttons
+      transactionsContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('delete-btn')) {
+          const id = parseInt(e.target.dataset.id);
+          expenses = expenses.filter(exp => exp.id !== id);
+          localStorage.setItem('expenses', JSON.stringify(expenses));
+          renderTransactions();
+          updateSummary();
+          updateCharts();
+        }
+      });
+    }
+
+    // Update total summary
+    function updateSummary() {
+      const total = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+      totalAmount.textContent = `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    }
+
+    // Update charts using Chart.js
+    function updateCharts() {
+      // Category pie chart
+      const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+      if (categoryChart) categoryChart.destroy();
+      
+      const categoryData = expenses.reduce((acc, exp) => {
+        acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
+        return acc;
+      }, {});
+      
+      categoryChart = new Chart(categoryCtx, {
+        type: 'pie',
+        data: {
+          labels: Object.keys(categoryData),
+          datasets: [{
+            data: Object.values(categoryData),
+            backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+
+      // Monthly bar chart (last 6 months)
+      const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+      if (monthlyChart) monthlyChart.destroy();
+      
+      const monthlyData = {};
+      expenses.forEach(exp => {
+        const month = exp.date.slice(0, 7); // YYYY-MM
+        monthlyData[month] = (monthlyData[month] || 0) + exp.amount;
+      });
+      
+      const sortedMonths = Object.keys(monthlyData).sort().slice(-6);
+      
+      monthlyChart = new Chart(monthlyCtx, {
+        type: 'bar',
+        data: {
+          labels: sortedMonths,
+          datasets: [{
+            label: 'Expenses',
+            data: sortedMonths.map(month => monthlyData[month]),
+            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    // Initialize app on load
+    window.addEventListener('load', () => {
+      // Set today's date as default
+      dateInput.valueAsDate = new Date();
+      renderTransactions();
+      updateSummary();
+      updateCharts();
+    });
+  </script>
+</body>
+</html>

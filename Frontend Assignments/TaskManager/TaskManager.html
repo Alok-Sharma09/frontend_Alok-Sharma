@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Task Manager</title>
+  <link rel="stylesheet" href="TaskManager.css" />
+</head>
+<body>
+  <div class="app">
+    <h1>Task Manager</h1>
+
+    <form id="task-form">
+      <input
+        type="text"
+        id="task-input"
+        placeholder="Add a new task..."
+        autocomplete="off"
+      />
+      <button type="submit">Add</button>
+    </form>
+
+    <div class="controls">
+      <div class="filters">
+        <button data-filter="all" class="filter-btn active">All</button>
+        <button data-filter="active" class="filter-btn">Active</button>
+        <button data-filter="completed" class="filter-btn">Completed</button>
+      </div>
+      <button id="clear-completed" class="danger">Clear Completed</button>
+    </div>
+
+    <ul id="task-list">
+      <!-- tasks will be injected here -->
+    </ul>
+  </div>
+
+  <script src="TaskManager.js"></script>
+</body>
+</html>
